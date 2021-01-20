@@ -85,7 +85,7 @@ impl Message for TopicInfo {
         offset as u16
     }
 
-    fn deserialize(&mut self, buf: &[u8]) -> u16 {
+    fn deserialize(&mut self, _buf: &[u8]) -> u16 {
         0
     }
 
