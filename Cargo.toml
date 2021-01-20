@@ -2,7 +2,7 @@
 authors = ["Natesh Narain <nnaraindev@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "rosserial-rs"
+name = "rosserial"
 version = "0.1.0"
 
 [dependencies]
@@ -14,6 +14,7 @@ panic-halt = "0.2.0"
 panic-semihosting = { version = "0.5.6", features = ["exit"] }
 nb = "1.0.0"
 switch-hal = "0.3.2"
+spin = "0.7.1"
 
 [dependencies.stm32f3xx-hal]
 features = ["stm32f303xc", "rt"]
@@ -37,7 +38,7 @@ version = "0.5"
 
 # this lets you use `cargo fix`!
 [[bin]]
-name = "rosserial-rs"
+name = "rosserial"
 test = false
 bench = false
 
