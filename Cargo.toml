@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "rosserial"
+    "stm32f3discovery"
 ]
 
 

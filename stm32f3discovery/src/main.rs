@@ -9,7 +9,7 @@ use stm32f3xx_hal::stm32::Interrupt;
 
 use rtic::{app,  cyccnt::{Instant, U32Ext as _}};
 
-use rosserial::hardware::{Hardware, SerialRx, SerialTx};
+use stm32f3discovery::hardware::{Hardware, SerialRx, SerialTx};
 
 use rosserial::msgs::*;
 use rosserial::ros::{HardwareInterface, NodeHandle};
