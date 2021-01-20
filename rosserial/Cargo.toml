@@ -1,0 +1,43 @@
+[package]
+authors = ["Natesh Narain <nnaraindev@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "rosserial"
+version = "0.1.0"
+
+[dependencies]
+cortex-m = "0.6.0"
+cortex-m-rt = "0.6.10"
+cortex-m-rtic = "0.5.5"
+cortex-m-semihosting = "0.3.3"
+panic-halt = "0.2.0"
+panic-semihosting = { version = "0.5.6", features = ["exit"] }
+nb = "1.0.0"
+switch-hal = "0.3.2"
+spin = "0.7.1"
+
+[dependencies.stm32f3xx-hal]
+features = ["stm32f303xc", "rt"]
+version = "0.6.0"
+
+[dependencies.stm32-usbd]
+version = "0.5"
+
+# Uncomment for the panic example.
+# panic-itm = "0.4.1"
+
+# Uncomment for the allocator example.
+# alloc-cortex-m = "0.4.0"
+
+# Uncomment for the device example.
+# Update `memory.x`, set target to `thumbv7em-none-eabihf` in `.cargo/config`,
+# and then use `cargo build --examples device` to build it.
+# [dependencies.stm32f3]
+# features = ["stm32f303", "rt"]
+# version = "0.7.1"
+
+# this lets you use `cargo fix`!
+[[bin]]
+name = "rosserial"
+test = false
+bench = false
