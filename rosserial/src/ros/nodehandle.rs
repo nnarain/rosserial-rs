@@ -1,5 +1,12 @@
-use super::{Publisher, HardwareInterface};
+use super::{HardwareInterface, Publisher};
 use crate::msgs::{Message, rosserial_msgs, std_msgs};
+
+pub type PublisherHandle = usize;
+
+#[derive(Debug)]
+pub enum NodeHandleError {
+    MaxPublishersReached,
+}
 
 enum State {
     Sync,
@@ -16,16 +23,19 @@ enum State {
 // const PROTOCOL_VER1: u8 = 0xFF;
 const PROTOCOL_VER2: u8 = 0xFE;
 
+const MESSAGE_BUFFER_SIZE: usize = 1024;
+const MAX_PUB_SUBS: usize = 256;
+
 pub struct NodeHandle {
     state: State,
-    message_in: [u8; 1024],
+    message_in: [u8; MESSAGE_BUFFER_SIZE],
     index: usize,
     bytes: u16,
     topic: u16,
     checksum: u16,
     configured: bool,
 
-    publishers: [Option<Publisher>; 256],
+    publishers: [Option<Publisher>; MAX_PUB_SUBS],
 }
 
 impl Default for NodeHandle {
@@ -39,23 +49,28 @@ impl Default for NodeHandle {
             checksum: 0,
             configured: false,
 
-            publishers: [None; 256],
+            publishers: [None; MAX_PUB_SUBS],
         }
     }
 }
 
 impl NodeHandle {
-    pub fn advertise<Msg: Message>(&mut self, topic: &'static str) {
-        for (i, p) in self.publishers.iter_mut().enumerate() {
-            if p.is_none() {
-                *p = Some(Publisher::new(topic, (i + 100) as u16, Msg::name(), Msg::md5()));
-                break;
-            }
+    pub fn advertise<Msg: Message>(&mut self, topic: &'static str) -> Result<PublisherHandle, NodeHandleError> {
+        // Find the next available slot
+        let slot = self.publishers.iter_mut().filter(|item| item.is_none()).enumerate().next();
+
+        if let Some((i, slot)) = slot {
+            let handle = i;
+            *slot = Some(Publisher::new(topic, (i + 100) as u16, Msg::name(), Msg::md5()));
+            Ok(handle)
+        }
+        else {
+            Err(NodeHandleError::MaxPublishersReached)
         }
     }
 
-    pub fn publish(&self, id: usize, msg: &dyn Message, hardware: &mut dyn HardwareInterface) {
-        if let Some(ref p) = self.publishers[id] {
+    pub fn publish(&self, handle: usize, msg: &dyn Message, hardware: &mut dyn HardwareInterface) {
+        if let Some(ref p) = self.publishers[handle] {
             self.send_message(p.id, msg, hardware);
         }
     }
