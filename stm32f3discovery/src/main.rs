@@ -82,7 +82,7 @@ const APP: () = {
         let mut last_pub = Instant::now();
 
         let mut nodehandle = NodeHandle::default();
-        nodehandle.advertise::<std_msgs::Bool>("test");
+        let test_pub = nodehandle.advertise::<std_msgs::Bool>("test").unwrap();
 
         loop {
             let current_time = Instant::now();
@@ -103,7 +103,7 @@ const APP: () = {
                 let mut msg = std_msgs::Bool::default();
                 msg.data = true;
 
-                nodehandle.publish(0, &msg, &mut spin_data);
+                nodehandle.publish(test_pub, &msg, &mut spin_data);
                 last_pub = current_time;
             }
         }
