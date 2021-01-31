@@ -2,11 +2,11 @@ use stm32f3xx_hal::{
     prelude::*,
     serial::{Serial, Rx, Tx},
     pac::Peripherals,
-    // gpio,
+    gpio,
 };
 use nb::block;
 
-// use switch_hal::{Switch, ActiveHigh, OutputSwitch, IntoSwitch};
+use switch_hal::{Switch, OutputSwitch, IntoSwitch};
 
 const RX_SZ: usize = 512;
 
@@ -46,7 +46,7 @@ impl Buffer {
 }
 
 
-// type Led = Switch<gpio::gpioe::PEx<gpio::Output<stm32f3xx_hal::gpio::PushPull>>, switch_hal::ActiveHigh>;
+pub type Led = Switch<gpio::gpioe::PEx<gpio::Output<stm32f3xx_hal::gpio::PushPull>>, switch_hal::ActiveHigh>;
 
 pub struct SerialRx {
     rx: Rx<stm32f3xx_hal::pac::USART1>,
@@ -91,7 +91,7 @@ impl SerialTx {
 pub struct Hardware {
     rx: SerialRx,
     tx: SerialTx,
-    // led1: Led,      // Debug LED 1
+    led1: Led,      // Debug LED 1
     // led2: Led,      // Debug LED 2
 }
 
@@ -116,28 +116,28 @@ impl Hardware {
         let (tx, rx) = serial.split();
 
         // debug led
-        // let mut gpioe = device.GPIOE.split(&mut rcc.ahb);
-        // let mut led1 = gpioe.pe9
-        //     .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper)
-        //     .downgrade()
-        //     .into_active_high_switch();
+        let mut gpioe = device.GPIOE.split(&mut rcc.ahb);
+        let mut led1 = gpioe.pe9
+            .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper)
+            .downgrade()
+            .into_active_high_switch();
         // let mut led2 = gpioe.pe13
         //     .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper)
         //     .downgrade()
         //     .into_active_high_switch();
 
-        // led1.off().ok();
+        led1.off().ok();
         // led2.off().ok();
 
         Hardware {
             rx: SerialRx::new(rx),
             tx: SerialTx::new(tx),
-            // led1,
+            led1,
             // led2,
         }
     }
 
-    pub fn split(self) -> (SerialRx, SerialTx) {
-        (self.rx, self.tx)
+    pub fn split(self) -> (SerialRx, SerialTx, Led) {
+        (self.rx, self.tx, self.led1)
     }
 }

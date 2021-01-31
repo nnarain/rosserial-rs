@@ -1,5 +1,7 @@
-use super::{HardwareInterface, Publisher};
+use super::{HardwareInterface, Publisher, MessageHandler, TopicBase};
 use crate::msgs::{Message, rosserial_msgs, std_msgs};
+
+// use alloc::boxed::Box;
 
 pub type PublisherHandle = usize;
 
@@ -26,7 +28,8 @@ const PROTOCOL_VER2: u8 = 0xFE;
 const MESSAGE_BUFFER_SIZE: usize = 1024;
 const MAX_PUB_SUBS: usize = 256;
 
-pub struct NodeHandle {
+
+pub struct NodeHandle<'a> {
     state: State,
     message_in: [u8; MESSAGE_BUFFER_SIZE],
     index: usize,
@@ -36,9 +39,11 @@ pub struct NodeHandle {
     configured: bool,
 
     publishers: [Option<Publisher>; MAX_PUB_SUBS],
+    subscribers: [Option<&'a mut dyn MessageHandler>; MAX_PUB_SUBS],
+    subscriber_info: [Option<rosserial_msgs::TopicInfo>; MAX_PUB_SUBS],
 }
 
-impl Default for NodeHandle {
+impl<'a> Default for NodeHandle<'a> {
     fn default() -> Self {
         NodeHandle {
             state: State::Sync,
@@ -50,11 +55,13 @@ impl Default for NodeHandle {
             configured: false,
 
             publishers: [None; MAX_PUB_SUBS],
+            subscribers: [None; MAX_PUB_SUBS],
+            subscriber_info: [None; MAX_PUB_SUBS],
         }
     }
 }
 
-impl NodeHandle {
+impl<'a> NodeHandle<'a> {
     pub fn advertise<Msg: Message>(&mut self, topic: &'static str) -> Result<PublisherHandle, NodeHandleError> {
         // Find the next available slot
         let slot = self.publishers.iter_mut().filter(|item| item.is_none()).enumerate().next();
@@ -66,6 +73,24 @@ impl NodeHandle {
         }
         else {
             Err(NodeHandleError::MaxPublishersReached)
+        }
+    }
+
+    pub fn register_subscriber<Sub: MessageHandler + TopicBase, Msg: Message>(&mut self, sub: &'a mut Sub) {
+        let slot = self.subscribers.iter_mut().filter(|item| item.is_none()).enumerate().next();
+        if let Some((i, slot)) = slot {
+            // Info for this topic
+            let mut ti = rosserial_msgs::TopicInfo::default();
+            ti.id = (i as u16) + 100;
+            ti.name = sub.topic();
+            ti.message_type = sub.message_type();
+            ti.md5 = sub.md5sum();
+            ti.buffer_size = 256;
+
+            self.subscriber_info[i] = Some(ti);
+
+            *slot = Some(sub);
+
         }
     }
 
@@ -109,11 +134,9 @@ impl NodeHandle {
                     // Message Length Checksum = 255 - ((Message Length High Byte + Message Length Low Byte) % 256 )
                     // TODO(nnarain): This doesn't work?
                     // state = if checksum % 256 == 255 {
-                    //     cx.resources.led1.on().ok();
                     //     State::TopicIdLsb
                     // }
                     // else {
-                    //     cx.resources.led2.on().ok();
                     //     State::Sync
                     // };
                     self.state = State::TopicIdLsb;
@@ -151,6 +174,14 @@ impl NodeHandle {
                     else if self.topic == rosserial_msgs::TOPICINFO_ID_TX_STOP {
                         self.configured = false;
                     }
+                    else {
+                        let idx = self.topic - 100;
+                        if (idx as usize) < self.subscribers.len() {
+                            if let Some(ref mut sub) = self.subscribers[idx as usize] {
+                                sub.handle_message(&self.message_in[..]);
+                            }
+                        }
+                    }
 
                     self.state = State::Sync;
                 },
@@ -164,16 +195,16 @@ impl NodeHandle {
     }
 
     fn negotiate_topics(&self, hardware: &mut dyn HardwareInterface) {
-        let mut ti = rosserial_msgs::TopicInfo::default();
         for p in self.publishers.iter() {
             if let Some(ref p) = p {
-                ti.id = p.id;
-                ti.name = p.topic;
-                ti.message_type = p.message_type;
-                ti.md5 = p.md5sum;
-                ti.buffer_size = 256;
-    
+                let ti: rosserial_msgs::TopicInfo = (*p).into();
                 self.send_message(rosserial_msgs::TOPICINFO_ID_PUBLISHER, &ti, hardware);
+            }
+        }
+
+        for ti in self.subscriber_info.iter() {
+            if let Some(ref ti) = ti {
+                self.send_message(rosserial_msgs::TOPICINFO_ID_SUBSCRIBER, ti, hardware);
             }
         }
     }
