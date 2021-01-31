@@ -9,10 +9,15 @@ use stm32f3xx_hal::stm32::Interrupt;
 
 use rtic::{app,  cyccnt::{Instant, U32Ext as _}};
 
-use stm32f3discovery::hardware::{Hardware, SerialRx, SerialTx};
+use stm32f3discovery::hardware::{Hardware, SerialRx, SerialTx, Led};
 
 use rosserial::msgs::*;
-use rosserial::ros::{HardwareInterface, NodeHandle};
+use rosserial::ros::{HardwareInterface, NodeHandle, Subscriber};
+
+use switch_hal::OutputSwitch;
+
+use heapless::spsc::Queue;
+use heapless::consts::*;
 
 struct SpinInstance<'a> {
     // rx: &'a SerialRx,
@@ -49,6 +54,7 @@ const APP: () = {
     struct Resources {
         rx: SerialRx,
         tx: SerialTx,
+        led: Led,
     }
 
     #[init(spawn = [spin])]
@@ -63,11 +69,12 @@ const APP: () = {
         // pend all used interrupts
         rtic::pend(Interrupt::USART1_EXTI25);
 
-        let (rx, tx) = Hardware::initialize(cx.device).split();
+        let (rx, tx, led) = Hardware::initialize(cx.device).split();
 
         init::LateResources {
             rx,
             tx,
+            led,
         }
     }
 
@@ -76,13 +83,21 @@ const APP: () = {
         loop {}
     }
 
-    #[task(resources = [rx, tx])]
+    #[task(resources = [rx, tx, led])]
     fn spin(mut cx: spin::Context) {
         let mut last_sync = Instant::now();
         let mut last_pub = Instant::now();
 
+        let mut led_cmd_queue: Queue<bool, U235, _> = Queue::u8();
+        let (mut cmd_in, mut cmd_out) = led_cmd_queue.split();
+
+        let mut bool_sub = Subscriber::new("led_cmd", move |msg: std_msgs::Bool| {
+            cmd_in.enqueue(msg.data).unwrap();
+        });
+
         let mut nodehandle = NodeHandle::default();
         let test_pub = nodehandle.advertise::<std_msgs::Bool>("test").unwrap();
+        nodehandle.register_subscriber::<_, std_msgs::Bool>(&mut bool_sub);
 
         loop {
             let current_time = Instant::now();
@@ -106,6 +121,16 @@ const APP: () = {
                 nodehandle.publish(test_pub, &msg, &mut spin_data);
                 last_pub = current_time;
             }
+
+            // led cmd events
+            if let Some(cmd) = cmd_out.dequeue() {
+                if cmd {
+                    cx.resources.led.on().ok();
+                }
+                else {
+                    cx.resources.led.off().ok();
+                }
+            }
         }
     }
 
@@ -118,5 +143,6 @@ const APP: () = {
     // spare interrupt used for scheduling software tasks
     extern "C" {
         fn USART2_EXTI26();
+        fn EXTI0();
     }
 };

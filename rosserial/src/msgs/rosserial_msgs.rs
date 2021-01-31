@@ -10,7 +10,7 @@ pub const TOPICINFO_ID_TIME: u16 = 10;
 pub const TOPICINFO_ID_TX_STOP: u16 = 11;
 
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct TopicInfo {
     pub id: u16,
     pub name: &'static str,
